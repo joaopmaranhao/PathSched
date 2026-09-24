@@ -1,10 +1,10 @@
 use std::collections::HashMap;
-pub struct Graph {
+pub struct WeightedGraph {
     adjacencias: HashMap<char, Vec<(char, f64)>>,
 }
-impl Graph {
+impl WeightedGraph {
     fn new(params: HashMap<char, Vec<(char, f64)>>) -> Self {
-        Graph {
+        WeightedGraph {
             adjacencias: params,
         }
     }
