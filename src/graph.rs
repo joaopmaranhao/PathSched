@@ -1,17 +1,18 @@
 use std::collections::{HashMap, HashSet};
+#[derive(Debug)]
 pub struct WeightedGraph {
     adjacencias: HashMap<char, Vec<(char, f64)>>,
 }
 impl WeightedGraph {
-    fn new(params: HashMap<char, Vec<(char, f64)>>) -> Self {
+    pub fn new(params: HashMap<char, Vec<(char, f64)>>) -> Self {
         WeightedGraph {
             adjacencias: params,
         }
     }
-    fn bfs(&self) -> Option<Vec<char>> {
+    pub fn bfs(&self) -> Option<Vec<char>> {
         todo!()
     }
-    fn dfs(&self, no_inicio: char, no_objetivo: char) -> Option<Vec<char>> {
+    pub fn dfs(&self, no_inicio: char, no_objetivo: char) -> Option<Vec<char>> {
         let mut corte = false;
         let mut visitados = HashSet::new();
         self.dls(
@@ -22,13 +23,13 @@ impl WeightedGraph {
             &mut visitados,
         )
     }
-    fn ucs(&self) -> Option<Vec<char>> {
+    pub fn ucs(&self) -> Option<Vec<char>> {
         todo!()
     }
-    fn ids(&self) -> Option<Vec<char>> {
+    pub fn ids(&self) -> Option<Vec<char>> {
         todo!()
     }
-    fn dls(
+    pub fn dls(
         &self,
         no_inicio: char,
         no_objetivo: char,
