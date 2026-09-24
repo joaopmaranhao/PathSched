@@ -26,8 +26,25 @@ impl WeightedGraph {
     pub fn ucs(&self) -> Option<Vec<char>> {
         todo!()
     }
-    pub fn ids(&self) -> Option<Vec<char>> {
-        todo!()
+    pub fn ids(
+        &self,
+        no_inicio: char,
+        no_objetivo: char,
+        max_iterations: usize,
+    ) -> Option<Vec<char>> {
+        let mut limite: usize = 0;
+        while limite <= max_iterations {
+            let mut corte = false;
+            let mut visitados = HashSet::new();
+            if let Some(x) = self.dls(no_inicio, no_objetivo, limite, &mut corte, &mut visitados) {
+                return Some(x);
+            }
+            if !corte {
+                return None;
+            }
+            limite += 1;
+        }
+        None
     }
     pub fn dls(
         &self,
