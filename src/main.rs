@@ -14,5 +14,7 @@ fn main() {
     let mut corte = false;
     let mut visitados = std::collections::HashSet::new();
     let res_dls = g.dls('A', 'E', 2, &mut corte, &mut visitados);
+    let res_ucs = g.ucs('A', 'E');
     println!("{res_dls:?}");
+    println!("{res_ucs:?}");
 }

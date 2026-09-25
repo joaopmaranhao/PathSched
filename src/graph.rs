@@ -1,8 +1,33 @@
-use std::collections::{HashMap, HashSet};
-#[derive(Debug)]
+use std::collections::{HashMap, HashSet, BinaryHeap};
+use std::cmp::Ordering;
+#[derive(Debug, Clone)]
+struct Entry {
+    cost: f64,
+    node: char,
+    path: Vec<char>,
+}
+impl PartialEq for Entry {
+    fn eq(&self, other: &Self) -> bool {
+        self.cost == other.cost
+    }
+}
+impl Eq for Entry {}
+
+impl PartialOrd for Entry {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for Entry {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // inverte a comparação de custo (para virar min-heap)
+        other.cost.partial_cmp(&self.cost).unwrap_or(Ordering::Equal)
+    }
+}
 pub struct WeightedGraph {
     adjacencias: HashMap<char, Vec<(char, f64)>>,
 }
+
 impl WeightedGraph {
     pub fn new(params: HashMap<char, Vec<(char, f64)>>) -> Self {
         WeightedGraph {
@@ -23,8 +48,46 @@ impl WeightedGraph {
             &mut visitados,
         )
     }
-    pub fn ucs(&self) -> Option<Vec<char>> {
-        todo!()
+    pub fn ucs(
+        &self,
+        no_inicio: char, 
+        no_objetivo: char
+    ) -> Option<Vec<char>> {
+        
+        let mut priority_queue : BinaryHeap<Entry> = BinaryHeap::new();
+        let mut visited : HashSet<char> = HashSet::new();
+
+        priority_queue.push(Entry {
+            cost: 0.0,
+            node : no_inicio,
+            path: vec![no_inicio],
+         });
+
+        while let Some(Entry {cost, node, path}) = priority_queue.pop() {
+            if node == no_objetivo {
+                return Some(path);
+            }
+            if visited.contains(&node){
+                continue;
+            }
+            visited.insert(node);
+
+            if let Some(neighbors) = self.adjacencias.get(&node) {
+                for &(neighbor, weight) in neighbors {
+                    if !visited.contains(&neighbor){
+                        let mut new_path = path.clone();
+                        new_path.push(neighbor);
+                        priority_queue.push(
+                            Entry {
+                                cost : cost + weight,
+                                node : neighbor,
+                                path : new_path,
+                            });
+                    }
+                }
+            }
+        }
+        None       
     }
     pub fn ids(
         &self,
