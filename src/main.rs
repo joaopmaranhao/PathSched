@@ -1,20 +1,55 @@
-use crate::graph::WeightedGraph;
-use std::collections::HashMap;
-mod graph;
+use pathsched::web;
+use std::net::SocketAddr;
+use tokio::net::TcpListener;
 
-fn main() {
-    let mut adjacencias: HashMap<char, Vec<(char, f64)>> = HashMap::new();
+const PORTA_PADRAO: u16 = 3000;
 
-    adjacencias.insert('A', vec![('B', 4.0), ('C', 2.0)]);
-    adjacencias.insert('B', vec![('D', 2.0), ('C', 1.0)]);
-    adjacencias.insert('C', vec![('D', 5.0), ('E', 10.0)]);
-    adjacencias.insert('D', vec![('E', 1.0)]);
-    adjacencias.insert('E', vec![]);
-    let g = WeightedGraph::new(adjacencias);
-    let mut corte = false;
-    let mut visitados = std::collections::HashSet::new();
-    let res_dls = g.dls('A', 'E', 2, &mut corte, &mut visitados);
-    let res_ucs = g.ucs('A', 'E');
-    println!("{res_dls:?}");
-    println!("{res_ucs:?}");
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let porta = porta_configurada();
+    let endereco = SocketAddr::from(([127, 0, 0, 1], porta));
+    let url = format!("http://{endereco}");
+
+    let listener = TcpListener::bind(endereco).await?;
+    println!("PathSched — visualizador de busca em grafos");
+    println!("  servidor em {url}");
+    println!("  o grafo é montado no navegador (exemplo pronto, JSON ou editor visual)");
+    println!("  encerrar com ctrl-c");
+
+    if abrir_navegador() {
+        let url_para_abrir = url.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+            if let Err(erro) = open::that(&url_para_abrir) {
+                eprintln!(
+                    "não consegui abrir o navegador: {erro} — abra {url_para_abrir} no navegador"
+                );
+            }
+        });
+    }
+
+    axum::serve(listener, web::router())
+        .with_graceful_shutdown(shutdown())
+        .await?;
+    println!("servidor encerrado");
+    Ok(())
+}
+
+fn porta_configurada() -> u16 {
+    std::env::var("PORT")
+        .ok()
+        .and_then(|valor| valor.parse().ok())
+        .unwrap_or(PORTA_PADRAO)
+}
+
+fn abrir_navegador() -> bool {
+    let flag = std::env::args().any(|arg| arg == "--no-open");
+    let env = std::env::var("PATHSCHED_NO_OPEN").is_ok();
+    !flag && !env
+}
+
+async fn shutdown() {
+    if tokio::signal::ctrl_c().await.is_ok() {
+        println!("\ninterrompido pelo usuário");
+    }
 }

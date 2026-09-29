@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PathSched — visualizador de busca em grafos</title>
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='%235b8cff'/></svg>" />
+</head>
+<body>
+  <header class="topo">
+    <div class="marca">
+      <span class="logo">PathSched</span>
+      <span class="subtitulo">visualizador de busca em grafos · UCS, IDS, DLS, BFS e DFS</span>
+    </div>
+    <div class="topo-direita">
+      <span id="badge-backend" class="badge badge-offline">conectando…</span>
+      <span class="url" id="url-backend"></span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="painel painel-esquerdo">
+      <section class="bloco">
+        <h2>Grafo</h2>
+        <label class="campo">
+          <span>Exemplo</span>
+          <select id="preset"></select>
+        </label>
+        <p class="dica" id="descricao-preset"></p>
+        <div class="botoes-linha">
+          <button id="btn-layout-circular" class="secundario" type="button">Layout circular</button>
+          <button id="btn-layout-grade" class="secundario" type="button">Layout em grade</button>
+        </div>
+        <label class="campo">
+          <span>Nós <em id="contagem-nos">0</em></span>
+          <input type="text" id="novo-no" placeholder="rótulo do novo nó" />
+        </label>
+        <label class="campo">
+          <span>Custo da nova aresta</span>
+          <input type="number" id="nova-aresta" value="1" min="0" step="0.5" />
+        </label>
+        <label class="campo checkbox">
+          <input type="checkbox" id="modo-edicao" />
+          <span>Modo edição (clicar para criar)</span>
+        </label>
+        <label class="campo checkbox">
+          <input type="checkbox" id="grafo-dirigido" />
+          <span>Grafo dirigido (setas)</span>
+        </label>
+        <details class="json">
+          <summary>Ver / editar JSON</summary>
+          <textarea id="json-grafo" spellcheck="false" rows="10"></textarea>
+          <div class="botoes-linha">
+            <button id="btn-aplicar-json" type="button">Aplicar JSON</button>
+            <button id="btn-copiar-json" class="secundario" type="button">Copiar</button>
+          </div>
+        </details>
+        <p class="ajuda" id="ajuda-edicao">
+          Arraste os nós para mover. No modo edição: clique no vazio para criar um nó, clique em um nó e depois em outro
+          para criar a aresta, duplo clique em um nó renomeia e duplo clique em uma aresta troca o custo.
+        </p>
+      </section>
+
+      <section class="bloco">
+        <h2>Busca</h2>
+        <label class="campo">
+          <span>Algoritmo</span>
+          <select id="algoritmo">
+            <option value="ucs">UCS — Busca de Custo Uniforme</option>
+            <option value="ids">IDS — Busca Iterativa em Profundidade</option>
+            <option value="dls">DLS — Busca em Profundidade Limitada</option>
+            <option value="bfs">BFS — Busca em Largura</option>
+            <option value="dfs">DFS — Busca em Profundidade</option>
+          </select>
+        </label>
+        <p class="dica" id="descricao-algoritmo"></p>
+        <label class="campo">
+          <span>Início</span>
+          <select id="inicio"></select>
+        </label>
+        <label class="campo">
+          <span>Objetivo</span>
+          <select id="objetivo"></select>
+        </label>
+        <label class="campo" id="campo-iteracoes">
+          <span>Máx. de iterações (IDS)</span>
+          <input type="number" id="max-iteracoes" value="20" min="1" max="200" />
+        </label>
+        <label class="campo" id="campo-limite">
+          <span>Limite de profundidade (DLS)</span>
+          <input type="number" id="limite" value="5" min="0" max="100" />
+        </label>
+        <button id="btn-executar" class="primario grande" type="button">Executar busca</button>
+        <p class="erro" id="erro-busca" hidden></p>
+      </section>
+    </aside>
+
+    <section class="palco">
+      <div class="controles">
+        <button id="btn-inicio" class="icone" type="button" title="Primeiro passo">⏮</button>
+        <button id="btn-anterior" class="icone" type="button" title="Passo anterior">◀</button>
+        <button id="btn-tocar" class="primario" type="button" title="Tocar / pausar">▶ Tocar</button>
+        <button id="btn-proximo" class="icone" type="button" title="Próximo passo">▶</button>
+        <button id="btn-fim" class="icone" type="button" title="Último passo">⏭</button>
+        <label class="velocidade">
+          <span>Velocidade</span>
+          <input type="range" id="velocidade" min="1" max="30" value="8" />
+          <em id="valor-velocidade">8x</em>
+        </label>
+        <div class="contador"><strong id="passo-atual">0</strong> / <span id="passo-total">0</span></div>
+      </div>
+      <div class="barra-progresso"><div id="progresso"></div></div>
+
+      <div class="palco-grafo">
+        <svg id="palco-svg" tabindex="0" aria-label="Grafo"></svg>
+        <div class="legenda">
+          <span><i class="cor inicio"></i>início</span>
+          <span><i class="cor objetivo"></i>objetivo</span>
+          <span><i class="cor fronteira"></i>fronteira</span>
+          <span><i class="cor expandido"></i>expandido</span>
+          <span><i class="cor atual"></i>em análise</span>
+          <span><i class="cor caminho"></i>caminho atual</span>
+          <span><i class="cor solucao"></i>caminho final</span>
+          <span><i class="cor falha"></i>podado</span>
+        </div>
+      </div>
+
+      <div class="resumo" id="resumo">
+        <div class="resumo-item"><span>Situação</span><strong id="res-situacao">—</strong></div>
+        <div class="resumo-item"><span>Caminho</span><strong id="res-caminho">—</strong></div>
+        <div class="resumo-item"><span>Custo total</span><strong id="res-custo">—</strong></div>
+        <div class="resumo-item"><span>Nós expandidos</span><strong id="res-expandidos">—</strong></div>
+        <div class="resumo-item"><span>Passos</span><strong id="res-passos">—</strong></div>
+      </div>
+      <div class="iteracoes" id="iteracoes" hidden>
+        <span class="iteracoes-titulo">Iterações do IDS</span>
+        <div class="iteracoes-barra" id="iteracoes-barra"></div>
+      </div>
+    </section>
+
+    <aside class="painel painel-direito">
+      <section class="bloco">
+        <h2>Passo a passo</h2>
+        <div class="passo-info">
+          <span class="fase" id="fase">—</span>
+          <span class="custo" id="custo-atual">g = —</span>
+        </div>
+        <p class="mensagem" id="mensagem">Escolha o grafo e clique em “Executar busca”.</p>
+        <dl class="metadados">
+          <div><dt>Profundidade</dt><dd id="m-profundidade">—</dd></div>
+          <div><dt>Iteração</dt><dd id="m-iteracao">—</dd></div>
+          <div><dt>Limite</dt><dd id="m-limite">—</dd></div>
+        </dl>
+        <div class="faixa">
+          <span class="faixa-rotulo">Caminho em construção</span>
+          <div class="chips" id="chips-caminho"><em>vazio</em></div>
+        </div>
+      </section>
+
+      <section class="bloco">
+        <h2>Fila / pilha <em id="tamanho-fronteira">0</em></h2>
+        <div class="tabela-wrap">
+          <table class="tabela" id="tabela-fronteira">
+            <thead>
+              <tr><th>#</th><th>nó</th><th>g</th><th>custo</th><th>caminho</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="dica" id="nota-fronteira"></p>
+      </section>
+
+      <section class="bloco">
+        <h2>Fechados <em id="total-visitados">0</em></h2>
+        <div class="chips" id="chips-visitados"><em>—</em></div>
+        <h2 class="separado">Pilha de chamada <em id="total-pilha">0</em></h2>
+        <div class="chips" id="chips-pilha"><em>—</em></div>
+      </section>
+
+      <section class="bloco cresce">
+        <h2>Registro</h2>
+        <ol class="log" id="log"><li class="log-vazio">nenhum passo ainda</li></ol>
+      </section>
+    </aside>
+  </main>
+
+  <div class="modal-fundo" id="modal" hidden>
+    <form class="modal" id="modal-form">
+      <h3 id="modal-titulo">Confirmar</h3>
+      <input type="text" id="modal-entrada" autocomplete="off" />
+      <div class="botoes-linha">
+        <button type="button" id="modal-cancelar" class="secundario">Cancelar</button>
+        <button type="submit" class="primario">Confirmar</button>
+      </div>
+    </form>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
