@@ -244,15 +244,15 @@ impl WeightedGraph {
     }
 
     pub fn bfs(&self, no_inicio: &str, no_objetivo: &str) -> Option<Vec<NodeId>> {
-        crate::search::uniform::bfs(self, no_inicio, no_objetivo).path
+        crate::search::dfs_and_bfs::bfs(self, no_inicio, no_objetivo).path
     }
 
     pub fn dfs(&self, no_inicio: &str, no_objetivo: &str) -> Option<Vec<NodeId>> {
-        crate::search::uniform::dfs(self, no_inicio, no_objetivo, None, "DFS").path
+        crate::search::dfs_and_bfs::dfs(self, no_inicio, no_objetivo, None, "DFS").path
     }
 
     pub fn ucs(&self, no_inicio: &str, no_objetivo: &str) -> Option<Vec<NodeId>> {
-        crate::search::cost::ucs(self, no_inicio, no_objetivo).path
+        crate::search::ucs::ucs(self, no_inicio, no_objetivo).path
     }
 
     pub fn dls(
@@ -261,7 +261,7 @@ impl WeightedGraph {
         no_objetivo: &str,
         max_iterations: usize,
     ) -> Option<Vec<NodeId>> {
-        crate::search::depth::dls(self, no_inicio, no_objetivo, Some(max_iterations)).path
+        crate::search::dls_and_ids::dls(self, no_inicio, no_objetivo, Some(max_iterations)).path
     }
 
     pub fn ids(
@@ -270,7 +270,7 @@ impl WeightedGraph {
         no_objetivo: &str,
         max_iterations: usize,
     ) -> Option<Vec<NodeId>> {
-        crate::search::depth::ids(self, no_inicio, no_objetivo, max_iterations).path
+        crate::search::dls_and_ids::ids(self, no_inicio, no_objetivo, max_iterations).path
     }
 }
 

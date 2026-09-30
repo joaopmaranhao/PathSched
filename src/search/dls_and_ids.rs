@@ -1,4 +1,4 @@
-use super::{Execution, Iteration, WeightedGraph, uniform};
+use super::{Execution, Iteration, WeightedGraph, dfs_and_bfs};
 use crate::graph::NodeId;
 
 pub fn dls(
@@ -7,7 +7,7 @@ pub fn dls(
     objetivo: &str,
     limite: Option<usize>,
 ) -> Execution {
-    uniform::dfs(grafo, inicio, objetivo, limite, "DLS")
+    dfs_and_bfs::dfs(grafo, inicio, objetivo, limite, "DLS")
 }
 
 pub fn ids(grafo: &WeightedGraph, inicio: &str, objetivo: &str, max_iteracoes: usize) -> Execution {
