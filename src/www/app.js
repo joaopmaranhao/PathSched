@@ -49,6 +49,8 @@ const estado = {
   inicio: '',
   objetivo: '',
 };
+let sequenciaBusca = 0;
+let controladorBusca = null;
 
 const ui = {
   preset: el('preset'),
@@ -102,6 +104,7 @@ const ui = {
   resPassos: el('res-passos'),
   badge: el('badge-backend'),
   url: el('url-backend'),
+  modoMapa: el('modo-mapa'),
 };
 
 const renderizador = new Renderizador(ui.svg, {
@@ -147,6 +150,11 @@ async function verificarBackend() {
 }
 
 async function executarBusca() {
+  cancelarBuscaPendente();
+  player.pausar();
+  const idBusca = sequenciaBusca;
+  const controlador = new AbortController();
+  controladorBusca = controlador;
   const algoritmo = ui.algoritmo.value;
   const corpo = {
     graph: estado.grafo.paraJSON(),
@@ -164,19 +172,61 @@ async function executarBusca() {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(corpo),
+      signal: controlador.signal,
     });
     const dados = await resposta.json();
+    if (idBusca !== sequenciaBusca) return;
     if (!resposta.ok) throw new Error(dados.erro ?? 'falha na busca');
     receberResultado(dados);
   } catch (erro) {
+    if (idBusca !== sequenciaBusca || erro.name === 'AbortError') return;
+    estado.resultado = null;
     ui.erro.textContent = erro.message;
     ui.erro.hidden = false;
+    estado.podados = new Set();
     player.carregar([]);
-    ui.log.innerHTML = '<li class="log-vazio">nenhum passo executado</li>';
+    limparResumo();
+    limparRastro();
+    desenharGrafoAtual();
     ui.mensagem.textContent = 'Não foi possível executar a busca.';
   } finally {
-    ui.executar.disabled = false;
+    if (idBusca === sequenciaBusca) {
+      controladorBusca = null;
+      ui.executar.disabled = false;
+    }
   }
+}
+
+function cancelarBuscaPendente() {
+  sequenciaBusca += 1;
+  controladorBusca?.abort();
+  controladorBusca = null;
+  ui.executar.disabled = false;
+}
+
+function limparRastro() {
+  ui.log.replaceChildren();
+  const vazio = document.createElement('li');
+  vazio.className = 'log-vazio';
+  vazio.textContent = 'nenhum passo executado';
+  ui.log.append(vazio);
+  ui.iteracoes.hidden = true;
+  ui.iteracoesBarra.replaceChildren();
+  ui.passoAtual.textContent = '0';
+  ui.passoTotal.textContent = '0';
+  ui.progresso.style.width = '0%';
+  ui.fase.textContent = '—';
+  ui.custo.textContent = 'g = —';
+  ui.profundidade.textContent = '—';
+  ui.iteracao.textContent = '—';
+  ui.limitePasso.textContent = '—';
+  ui.tamanhoFronteira.textContent = '0';
+  ui.totalVisitados.textContent = '0';
+  ui.totalPilha.textContent = '0';
+  ui.tabela.replaceChildren();
+  ui.chipsCaminho.innerHTML = '<em>vazio</em>';
+  ui.chipsVisitados.innerHTML = '<em>—</em>';
+  ui.chipsPilha.innerHTML = '<em>—</em>';
 }
 
 function receberResultado(dados) {
@@ -256,11 +306,11 @@ function montarLog(trace) {
 // ---------------------------------------------------------------- pintura
 
 function pintarPasso(indice, passo) {
-  ui.passoAtual.textContent = String(indice + 1);
+  ui.passoAtual.textContent = passo ? String(indice + 1) : '0';
   ui.progresso.style.width = `${player.total ? ((indice + 1) / player.total) * 100 : 0}%`;
   ui.tocar.textContent = player.tocando ? '⏸ Pausar' : '▶ Tocar';
   if (!passo) {
-    renderizador.atualizar({});
+    renderizador.atualizar({ inicio: estado.inicio, objetivo: estado.objetivo, mapa: ui.modoMapa.checked, caminhosExplorados: new Set() });
     return;
   }
 
@@ -273,6 +323,18 @@ function pintarPasso(indice, passo) {
   }
 
   const fronteira = new Set((passo.frontier ?? []).map((i) => i.node));
+  const mapa = ui.modoMapa.checked;
+  const finalizado = indice === player.total - 1 && estado.resultado?.found;
+  const caminhosExplorados = new Set();
+  if (mapa && !finalizado) {
+    const adicionarCaminho = (caminho) => {
+      for (let i = 1; i < caminho.length; i += 1) caminhosExplorados.add(chaveTrecho(caminho[i - 1], caminho[i]));
+    };
+    (estado.resultado?.trace ?? []).slice(0, indice + 1).forEach((p) => {
+      adicionarCaminho(p.path ?? []);
+      (p.frontier ?? []).forEach((item) => adicionarCaminho(item.path ?? []));
+    });
+  }
   renderizador.atualizar({
     inicio: estado.inicio,
     objetivo: estado.objetivo,
@@ -282,6 +344,7 @@ function pintarPasso(indice, passo) {
     caminho: passo.path ?? [],
     falhos: new Set(estado.podados),
     solucao: estado.resultado?.found ? estado.resultado.path : [],
+    mapa, finalizado: Boolean(finalizado), caminhosExplorados,
   });
 
   ui.fase.textContent = FASE_ROTULO[passo.phase] ?? passo.phase;
@@ -300,6 +363,8 @@ function pintarPasso(indice, passo) {
   marcarLog(indice);
   marcarIteracao(passo.iteration);
 }
+
+function chaveTrecho(a, b) { return estado.grafo.directed ? `${a}>${b}` : [a, b].sort().join('|'); }
 
 function pintarCaminho(caminho) {
   ui.chipsCaminho.replaceChildren();
@@ -418,6 +483,7 @@ function carregarPreset(id, { executarBusca: executarDepois = false } = {}) {
 }
 
 function aplicarGrafo(grafo, { inicio, objetivo } = {}) {
+  cancelarBuscaPendente();
   const ids = grafo.ids();
   estado.grafo = grafo;
   estado.inicio = [inicio, ui.inicio.value].find((v) => v && grafo.existe(v)) ?? ids[0];
@@ -427,6 +493,7 @@ function aplicarGrafo(grafo, { inicio, objetivo } = {}) {
   estado.origemAresta = null;
 
   ui.dirigido.checked = grafo.directed;
+  ui.erro.hidden = true;
   ui.contagemNos.textContent = String(grafo.nodes.length);
   preencherSelectNos();
   limparResumo();
@@ -436,7 +503,7 @@ function aplicarGrafo(grafo, { inicio, objetivo } = {}) {
   ui.passoAtual.textContent = '0';
   ui.progresso.style.width = '0%';
   player.carregar([]);
-  renderizador.novoPreset(grafo);
+  renderizador.novoPreset(grafo, { inicio: estado.inicio, objetivo: estado.objetivo, mapa: ui.modoMapa.checked });
   sincronizarJson();
   ui.mensagem.textContent = 'Grafo carregado. Ajuste os parâmetros e execute a busca.';
   ui.fase.textContent = '—';
@@ -486,7 +553,7 @@ function aoClicVazio(ponto) {
   if (!ui.modoEdicao.checked) {
     estado.origemAresta = null;
     renderizador.selecao = null;
-    renderizador.desenhar(estado.grafo, {});
+    renderizador.atualizar(renderizador.estado ?? {});
     return false;
   }
   const rotulo = (ui.novoNo.value || '').trim() || estado.grafo.sufixoDeRotulo('N');
@@ -499,30 +566,34 @@ function aoClicVazio(ponto) {
 
 function aoClicNo(id) {
   if (!ui.modoEdicao.checked) {
+    const mudou = estado.inicio !== id;
     estado.inicio = id;
     ui.inicio.value = id;
+    if (mudou) invalidarBuscaVisual('Ponto de partida alterado. Execute a busca novamente.');
+    else renderizador.atualizar(renderizador.estado ?? {});
     return;
   }
   if (!estado.origemAresta) {
     estado.origemAresta = id;
     renderizador.selecao = id;
-    renderizador.desenhar(estado.grafo, {});
+    renderizador.atualizar(renderizador.estado ?? {});
     return;
   }
   const de = estado.origemAresta;
   estado.origemAresta = null;
   renderizador.selecao = null;
   if (de === id) {
-    renderizador.desenhar(estado.grafo, {});
+    renderizador.atualizar(renderizador.estado ?? {});
     return;
   }
   try {
-    estado.grafo.adicionarAresta(de, id, Number(ui.novaAresta.value) || 1);
+    const peso = ui.novaAresta.value.trim() === '' ? 1 : Number(ui.novaAresta.value);
+    estado.grafo.adicionarAresta(de, id, peso);
     aposEditar();
   } catch (erro) {
     ui.erro.textContent = erro.message;
     ui.erro.hidden = false;
-    renderizador.desenhar(estado.grafo, {});
+    renderizador.atualizar(renderizador.estado ?? {});
   }
 }
 
@@ -562,14 +633,38 @@ async function aoRemoverNo(id) {
 }
 
 function aposEditar() {
+  cancelarBuscaPendente();
   ui.erro.hidden = true;
   ui.contagemNos.textContent = String(estado.grafo.nodes.length);
   preencherSelectNos();
   estado.resultado = null;
+  estado.podados = new Set();
+  player.carregar([]);
   limparResumo();
-  renderizador.desenhar(estado.grafo, {});
+  limparRastro();
+  desenharGrafoAtual();
   sincronizarJson();
   ui.mensagem.textContent = 'Grafo editado. Execute a busca de novo para ver o novo percurso.';
+}
+
+function desenharGrafoAtual() {
+  renderizador.desenhar(estado.grafo, {
+    inicio: estado.inicio,
+    objetivo: estado.objetivo,
+    mapa: ui.modoMapa.checked,
+  });
+}
+
+function invalidarBuscaVisual(mensagem) {
+  cancelarBuscaPendente();
+  ui.erro.hidden = true;
+  estado.resultado = null;
+  estado.podados = new Set();
+  player.carregar([]);
+  limparResumo();
+  limparRastro();
+  ui.mensagem.textContent = mensagem;
+  desenharGrafoAtual();
 }
 
 // ---------------------------------------------------------------- modal
@@ -609,18 +704,43 @@ function perguntar(titulo, valorInicial = '') {
 // ---------------------------------------------------------------- controles
 
 function ligarControles() {
-  ui.preset.addEventListener('change', () => carregarPreset(ui.preset.value));
-  ui.algoritmo.addEventListener('change', atualizarDescricaoAlgoritmo);
+  ui.preset.addEventListener('change', () => carregarPreset(ui.preset.value, { executarBusca: true }));
+  ui.algoritmo.addEventListener('change', () => {
+    atualizarDescricaoAlgoritmo();
+    if (controladorBusca || estado.resultado) invalidarBuscaVisual('Algoritmo alterado. Execute a busca novamente.');
+  });
   ui.executar.addEventListener('click', executarBusca);
   ui.inicio.addEventListener('change', () => {
-    estado.inicio = ui.inicio.value;
+    if (estado.inicio !== ui.inicio.value) {
+      estado.inicio = ui.inicio.value;
+      invalidarBuscaVisual('Ponto de partida alterado. Execute a busca novamente.');
+    }
   });
   ui.objetivo.addEventListener('change', () => {
-    estado.objetivo = ui.objetivo.value;
+    if (estado.objetivo !== ui.objetivo.value) {
+      estado.objetivo = ui.objetivo.value;
+      invalidarBuscaVisual('Destino alterado. Execute a busca novamente.');
+    }
+  });
+  ui.maxIteracoes.addEventListener('change', () => {
+    if (ui.algoritmo.value === 'ids' && (controladorBusca || estado.resultado)) {
+      invalidarBuscaVisual('Parâmetros da busca alterados. Execute novamente.');
+    }
+  });
+  ui.limite.addEventListener('change', () => {
+    if (ui.algoritmo.value === 'dls' && (controladorBusca || estado.resultado)) {
+      invalidarBuscaVisual('Parâmetros da busca alterados. Execute novamente.');
+    }
   });
   ui.modoEdicao.addEventListener('change', () => {
     ui.svg.classList.toggle('editando', ui.modoEdicao.checked);
     el('ajuda-edicao').style.opacity = ui.modoEdicao.checked ? '1' : '0.6';
+  });
+  ui.modoMapa.addEventListener('change', () => {
+    ui.svg.closest('.palco-grafo').classList.toggle('modo-mapa', ui.modoMapa.checked);
+    renderizador.modoMapa = ui.modoMapa.checked;
+    if (player.passo) pintarPasso(player.indice, player.passo);
+    else renderizador.atualizar({ ...renderizador.estado, inicio: estado.inicio, objetivo: estado.objetivo, mapa: ui.modoMapa.checked, caminhosExplorados: new Set() });
   });
   ui.dirigido.addEventListener('change', () => {
     estado.grafo.directed = ui.dirigido.checked;
@@ -630,13 +750,13 @@ function ligarControles() {
   el('btn-layout-circular').addEventListener('click', () => {
     const { largura, altura } = renderizador.tamanho();
     estado.grafo.aplicarLayout('circular', largura, altura);
-    renderizador.desenhar(estado.grafo, {});
+    renderizador.desenhar(estado.grafo, renderizador.estado ?? { inicio: estado.inicio, objetivo: estado.objetivo, mapa: ui.modoMapa.checked });
     sincronizarJson();
   });
   el('btn-layout-grade').addEventListener('click', () => {
     const { largura, altura } = renderizador.tamanho();
     estado.grafo.aplicarLayout('grade', largura, altura);
-    renderizador.desenhar(estado.grafo, {});
+    renderizador.desenhar(estado.grafo, renderizador.estado ?? { inicio: estado.inicio, objetivo: estado.objetivo, mapa: ui.modoMapa.checked });
     sincronizarJson();
   });
 
