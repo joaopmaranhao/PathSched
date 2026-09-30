@@ -1,6 +1,6 @@
-pub mod cost;
-pub mod depth;
-pub mod uniform;
+pub mod ucs;
+pub mod dls_and_ids;
+pub mod dfs_and_bfs;
 
 use crate::graph::{ErroGrafo, Graph, NodeId, WeightedGraph};
 use serde::{Deserialize, Serialize};
@@ -237,16 +237,16 @@ pub fn executar(requisicao: &Requisicao) -> Result<SearchResult, ErroGrafo> {
     }
 
     let execucao = match algoritmo.as_str() {
-        BFS => uniform::bfs(&ponderado, &requisicao.start, &requisicao.goal),
-        DFS => uniform::dfs(&ponderado, &requisicao.start, &requisicao.goal, None, "DFS"),
-        UCS => cost::ucs(&ponderado, &requisicao.start, &requisicao.goal),
-        DLS => depth::dls(
+        BFS => dfs_and_bfs::bfs(&ponderado, &requisicao.start, &requisicao.goal),
+        DFS => dfs_and_bfs::dfs(&ponderado, &requisicao.start, &requisicao.goal, None, "DFS"),
+        UCS => ucs::ucs(&ponderado, &requisicao.start, &requisicao.goal),
+        DLS => dls_and_ids::dls(
             &ponderado,
             &requisicao.start,
             &requisicao.goal,
             requisicao.limit,
         ),
-        IDS => depth::ids(
+        IDS => dls_and_ids::ids(
             &ponderado,
             &requisicao.start,
             &requisicao.goal,

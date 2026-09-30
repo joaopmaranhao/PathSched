@@ -22,7 +22,9 @@ export class Player {
   }
 
   carregar(passos, { reiniciar = true } = {}) {
-    this.pausar();
+    if (this.relogio) clearInterval(this.relogio);
+    this.relogio = null;
+    this.tocando = false;
     this.passos = Array.isArray(passos) ? passos : [];
     if (reiniciar || this.indice > this.total - 1) this.indice = 0;
     this.aoMudar(this.indice, this.passo);

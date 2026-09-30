@@ -187,6 +187,13 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .velocidade { display: flex; align-items: center; gap: 8px; margin-left: auto; font-size: 11px; color: var(--texto-2); }
 .velocidade input { width: 130px; accent-color: var(--acento); }
 .velocidade em { font-style: normal; color: var(--texto); min-width: 28px; }
+.switch-mapa { display: inline-flex; align-items: center; gap: 7px; color: var(--texto-2); font-size: 11px; cursor: pointer; user-select: none; }
+.switch-mapa input { position: absolute; opacity: 0; pointer-events: none; }
+.switch-trilho { width: 30px; height: 17px; padding: 2px; border-radius: 99px; background: #303847; transition: background .2s; }
+.switch-trilho i { display: block; width: 13px; height: 13px; border-radius: 50%; background: #aab4c3; transition: transform .2s, background .2s; }
+.switch-mapa input:checked + .switch-trilho { background: #57428d; }
+.switch-mapa input:checked + .switch-trilho i { transform: translateX(13px); background: #d5c4ff; }
+.switch-mapa input:focus-visible + .switch-trilho { outline: 2px solid #a98cff; outline-offset: 2px; }
 .contador { color: var(--texto-2); font-size: 11px; }
 .contador strong { color: var(--texto); }
 
@@ -202,6 +209,18 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   border-radius: var(--raio);
   overflow: hidden;
 }
+
+.palco-grafo.modo-mapa {
+  background-color: #0b0a11;
+  border-color: #302842;
+  box-shadow: inset 0 0 70px #0009;
+}
+.modo-mapa #palco-svg { background: radial-gradient(ellipse, transparent 48%, #05040a62 100%); }
+.modo-mapa .aresta-rotulo, .modo-mapa .aresta-custo-bg { opacity: .6; }
+.modo-mapa .legenda { border-color: #45385f; background: #0b0912dc; }
+.mapa-base { pointer-events: none; }
+.mapa-base path { vector-effect: non-scaling-stroke; }
+.mapa-rotulo-area { fill: #668078; opacity: .62; font-size: 13px; letter-spacing: 4px; font-weight: 600; text-anchor: middle; }
 
 #palco-svg { width: 100%; height: 100%; display: block; cursor: grab; }
 #palco-svg.arrastando { cursor: grabbing; }
